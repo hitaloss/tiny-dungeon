@@ -42,11 +42,22 @@ player_walk_sprites = [
     Actor("player_walking_4"),
 ]
 
+player_attack_sprites = [
+    Actor("player_attacking_1"),
+    Actor("player_attacking_2"),
+    Actor("player_attacking_3"),
+    Actor("player_attacking_4"),
+    Actor("player_attacking_5"),
+]
+
 current_animation_sprites = player_idle_sprites
 current_sprite_index = 0
 animation_timer = 0.0
 animation_speed_idle = 0.3
 animation_speed_walk = 0.1
+
+animation_speed_attack = 0.1
+player_attacking = False
 
 
 def init_game():
@@ -79,37 +90,53 @@ def draw():
     player.draw()
 
 
+def player_attack_end():
+    global player_attacking
+    player_attacking = False
+
+
 def update():
-    global current_animation_sprites, current_sprite_index, animation_timer
+    global current_animation_sprites, current_sprite_index, animation_timer, player_attacking
 
     old_player_x = player.x
     old_player_y = player.y
 
     player_walking = False
 
-    if keyboard.left:
-        player.x -= 1
-        player_walking = True
-    if keyboard.right:
-        player.x += 1
-        player_walking = True
+    if player_attacking:
+        pass
+    elif keyboard.space:
+        player_attacking = True
+        player_walking = False
+        current_animation_sprites = player_attack_sprites
+        current_sprite_index = 0
+        animation_timer = 0.0
+    else:
+        if keyboard.left:
+            player.x -= 1
+            player_walking = True
+        if keyboard.right:
+            player.x += 1
+            player_walking = True
 
-    if not collision_check.collision_check(player.x, player.y):
-        player.x = old_player_x
+        if not collision_check.collision_check(player.x, player.y):
+            player.x = old_player_x
 
-    if keyboard.down:
-        player.y += 1
-        player_walking = True
-    if keyboard.up:
-        player.y -= 1
-        player_walking = True
+        if keyboard.down:
+            player.y += 1
+            player_walking = True
+        if keyboard.up:
+            player.y -= 1
+            player_walking = True
 
-    if not collision_check.collision_check(player.x, player.y):
-        player.y = old_player_y
+        if not collision_check.collision_check(player.x, player.y):
+            player.y = old_player_y
 
     animation_timer += 1 / 60
 
-    if player_walking:
+    if player_attacking:
+        speed_used = animation_speed_attack
+    elif player_walking:
         current_animation_sprites = player_walk_sprites
         speed_used = animation_speed_walk
     else:
@@ -118,9 +145,17 @@ def update():
 
     if animation_timer >= speed_used:
         animation_timer = 0
-        current_sprite_index = (current_sprite_index + 1) % len(
-            current_animation_sprites
-        )
+        current_sprite_index = current_sprite_index + 1
+
+        if (
+            current_animation_sprites == player_attack_sprites
+            and current_sprite_index >= len(current_animation_sprites)
+        ):
+            current_sprite_index = len(current_animation_sprites) - 1
+            player_attack_end()
+        else:
+            current_sprite_index %= len(current_animation_sprites)
+
         player.image = current_animation_sprites[current_sprite_index].image
 
 
