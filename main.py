@@ -1,4 +1,20 @@
 import pgzrun
+from pgzero.actor import Actor
+
+# A excessão que foi passada no teste
+from pygame import Rect as rect
+
+from config import (
+    DIR_NONE,
+    DIR_LEFT,
+    DIR_RIGHT,
+    DIR_UP,
+    DIR_DOWN,
+    ANIMATION_SPEED_IDLE,
+    ANIMATION_SPEED_WALK,
+    ANIMATION_SPEED_ATTACK,
+)
+
 from map.game_map import (
     MAP_WIDTH,
     MAP_HEIGHT,
@@ -8,9 +24,27 @@ from map.game_map import (
     MAP_DATA,
 )
 
-from pygame import Rect as rect
 
+from sprites.player_sprites import (
+    player_idle_sprites,
+    player_idle_left_sprites,
+    player_idle_up_sprites,
+    player_idle_down_sprites,
+    player_walk_sprites,
+    player_walk_left_sprites,
+    player_walk_up_sprites,
+    player_walk_down_sprites,
+    player_attack_sprites,
+    player_attack_left_sprites,
+    player_attack_up_sprites,
+    player_attack_down_sprites,
+    player_dying_sprites,
+    player_dying_left_sprites,
+    player_dying_up_sprites,
+    player_dying_down_sprites,
+)
 from utils import collision_check
+from utils.animation_manager import update_player_animation
 
 WIDTH = 800
 HEIGHT = 600
@@ -23,46 +57,19 @@ tiles = {}
 
 player = None
 
-player_sprites = {}
-player_current_sprite = "idle"
-player_current_sprite_index = 0
-player_sprite_timer = 0
 
-player_idle_sprites = [
-    Actor("player_idle_1"),
-    Actor("player_idle_2"),
-    Actor("player_idle_3"),
-    Actor("player_idle_4"),
-]
+DIR_NONE = 0
+DIR_LEFT = 1
+DIR_RIGHT = 2
+DIR_UP = 3
+DIR_DOWN = 4
+player_last_direction = DIR_DOWN
 
-player_walk_sprites = [
-    Actor("player_walking_1"),
-    Actor("player_walking_2"),
-    Actor("player_walking_3"),
-    Actor("player_walking_4"),
-]
 
-player_attack_sprites = [
-    Actor("player_attacking_1"),
-    Actor("player_attacking_2"),
-    Actor("player_attacking_3"),
-    Actor("player_attacking_4"),
-]
-
-player_dying_sprites = [
-    Actor("player_dying_1"),
-    Actor("player_dying_2"),
-    Actor("player_dying_3"),
-    Actor("player_dying_4"),
-]
-
-current_animation_sprites = player_idle_sprites
+current_animation_sprites = player_idle_down_sprites
 current_sprite_index = 0
 animation_timer = 0.0
-animation_speed_idle = 0.3
-animation_speed_walk = 0.1
 
-animation_speed_attack = 0.1
 player_attacking = False
 player_is_dead = False
 
@@ -107,7 +114,7 @@ def player_dying_end():
 
 
 def update():
-    global current_animation_sprites, current_sprite_index, animation_timer, player_attacking, player_is_dead
+    global current_animation_sprites, current_sprite_index, animation_timer, player_attacking, player_is_dead, player_last_direction
 
     old_player_x = player.x
     old_player_y = player.y
@@ -123,66 +130,52 @@ def update():
         player_is_dead = True
         player_attacking = False
         player_walking = False
-        current_animation_sprites = player_dying_sprites
         current_sprite_index = 0
         animation_timer = 0.0
     elif keyboard.space:
         player_attacking = True
         player_walking = False
-        current_animation_sprites = player_attack_sprites
         current_sprite_index = 0
         animation_timer = 0.0
     else:
         if keyboard.left:
             player.x -= 1
             player_walking = True
+            player_last_direction = DIR_LEFT
         if keyboard.right:
             player.x += 1
             player_walking = True
-
+            player_last_direction = DIR_RIGHT
         if not collision_check.collision_check(player.x, player.y):
             player.x = old_player_x
 
         if keyboard.down:
             player.y += 1
             player_walking = True
+            player_last_direction = DIR_DOWN
         if keyboard.up:
             player.y -= 1
             player_walking = True
+            player_last_direction = DIR_UP
 
         if not collision_check.collision_check(player.x, player.y):
             player.y = old_player_y
 
-    animation_timer += 1 / 60
-
-    if player_is_dead:
-        speed_used = 0.2
-        current_animation_sprites = player_dying_sprites
-    elif player_attacking:
-        speed_used = animation_speed_attack
-    elif player_walking:
-        current_animation_sprites = player_walk_sprites
-        speed_used = animation_speed_walk
-    else:
-        current_animation_sprites = player_idle_sprites
-        speed_used = animation_speed_idle
-
-    if animation_timer >= speed_used:
-        animation_timer = 0
-        current_sprite_index = current_sprite_index + 1
-
-        if current_animation_sprites == player_attack_sprites:
-            if current_sprite_index >= len(player_attack_sprites):
-                current_sprite_index = len(player_attack_sprites) - 1
-                player_attack_end()
-        elif current_animation_sprites == player_dying_sprites:
-            if current_sprite_index >= len(player_dying_sprites):
-                current_sprite_index = len(player_dying_sprites) - 1
-                player_dying_end()
-        else:
-            current_sprite_index %= len(current_animation_sprites)
-
-        player.image = current_animation_sprites[current_sprite_index].image
+    current_animation_sprites, current_sprite_index, animation_timer = (
+        update_player_animation(
+            player,
+            player_is_dead,
+            player_attacking,
+            player_walking,
+            player_last_direction,
+            1 / 60.0,
+            current_animation_sprites,
+            current_sprite_index,
+            animation_timer,
+            player_attack_end,
+            player_dying_end,
+        )
+    )
 
 
 init_game()

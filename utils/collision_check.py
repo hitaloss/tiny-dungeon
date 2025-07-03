@@ -9,10 +9,12 @@ from map.game_map import (
     TILE_GIDS_COLISION,
 )
 
-PLAYER_COLISION_WIDTH = TILE_SIZE - 4
-PLAYER_COLISION_HEIGHT = TILE_SIZE - 4
-PLAYER_COLISION_OFFSET_X = 2
-PLAYER_COLISION_OFFSET_Y = 2
+from config import (
+    PLAYER_COLISION_HEIGHT,
+    PLAYER_COLISION_OFFSET_X,
+    PLAYER_COLISION_OFFSET_Y,
+    PLAYER_COLISION_WIDTH,
+)
 
 
 def collision_check(x_player_position, y_player_position):
