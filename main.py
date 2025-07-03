@@ -104,7 +104,7 @@ def update():
         player.y -= 1
         player_walking = True
 
-    if not collision_check(player.x, player.y):
+    if not collision_check.collision_check(player.x, player.y):
         player.y = old_player_y
 
     animation_timer += 1 / 60
