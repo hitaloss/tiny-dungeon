@@ -47,7 +47,6 @@ player_attack_sprites = [
     Actor("player_attacking_2"),
     Actor("player_attacking_3"),
     Actor("player_attacking_4"),
-    Actor("player_attacking_5"),
 ]
 
 current_animation_sprites = player_idle_sprites
@@ -147,12 +146,10 @@ def update():
         animation_timer = 0
         current_sprite_index = current_sprite_index + 1
 
-        if (
-            current_animation_sprites == player_attack_sprites
-            and current_sprite_index >= len(current_animation_sprites)
-        ):
-            current_sprite_index = len(current_animation_sprites) - 1
-            player_attack_end()
+        if current_animation_sprites == player_attack_sprites:
+            if current_sprite_index >= len(player_attack_sprites):
+                current_sprite_index = len(current_animation_sprites) - 1
+                player_attack_end()
         else:
             current_sprite_index %= len(current_animation_sprites)
 
