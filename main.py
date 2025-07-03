@@ -1,5 +1,4 @@
 import pgzrun
-from pgzero import animation
 from map.game_map import (
     MAP_WIDTH,
     MAP_HEIGHT,
@@ -9,12 +8,11 @@ from map.game_map import (
     MAP_DATA,
 )
 
-# "Rect" é a única exceção permitida no teste de utilização do Pygame
 from pygame import Rect as rect
 
 WIDTH = 800
 HEIGHT = 600
-TITLE = "Tiny Dugeon"
+TITLE = "Tiny Dungeon"
 
 BLACK = (0, 0, 0)
 MAP_BACKGROUND = (234, 165, 108)
@@ -60,6 +58,17 @@ def update():
         player.x -= 1
     if keyboard.right:
         player.x += 1
+
+    for y in range(MAP_HEIGHT):
+        for x in range(MAP_WIDTH):
+            tile_gid = MAP_DATA[y * MAP_WIDTH + x] & 0x3FFFFFFF
+            tile_name = TILE_GIDS.get(tile_gid)
+
+            if tile_name in TILE_GIDS_COLISION.values():
+                tile_rect = rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                if player.colliderect(tile_rect):
+                    player.x = old_player_x
+
     if keyboard.down:
         player.y += 1
     if keyboard.up:
@@ -67,20 +76,13 @@ def update():
 
     for y in range(MAP_HEIGHT):
         for x in range(MAP_WIDTH):
-            tile_gid = MAP_DATA[y * MAP_WIDTH + x] & 0x3FFFFFF
+            tile_gid = MAP_DATA[y * MAP_WIDTH + x] & 0x3FFFFFFF
             tile_name = TILE_GIDS.get(tile_gid)
 
             if tile_name in TILE_GIDS_COLISION.values():
                 tile_rect = rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
                 if player.colliderect(tile_rect):
-                    player.x = old_player_x
                     player.y = old_player_y
-                    return
-
-    player.left = max(16, player.left)
-    player.right = min(WIDTH - 16, player.right)
-    player.top = max(16, player.top)
-    player.bottom = min(HEIGHT - 16, player.bottom)
 
 
 init_game()
