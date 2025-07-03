@@ -10,6 +10,8 @@ from map.game_map import (
 
 from pygame import Rect as rect
 
+from utils import collision_check
+
 WIDTH = 800
 HEIGHT = 600
 TITLE = "Tiny Dungeon"
@@ -77,12 +79,6 @@ def draw():
     player.draw()
 
 
-PLAYER_COLISION_WIDTH = TILE_SIZE - 4
-PLAYER_COLISION_HEIGHT = TILE_SIZE - 4
-PLAYER_COLISION_OFFSET_X = 2
-PLAYER_COLISION_OFFSET_Y = 2
-
-
 def update():
     global current_animation_sprites, current_sprite_index, animation_timer
 
@@ -98,22 +94,8 @@ def update():
         player.x += 1
         player_walking = True
 
-    player_collision_check_rect_x = rect(
-        player.x + PLAYER_COLISION_OFFSET_X - (PLAYER_COLISION_WIDTH / 2),
-        player.y + PLAYER_COLISION_OFFSET_Y - (PLAYER_COLISION_HEIGHT / 2),
-        PLAYER_COLISION_WIDTH,
-        PLAYER_COLISION_HEIGHT,
-    )
-
-    for y in range(MAP_HEIGHT):
-        for x in range(MAP_WIDTH):
-            tile_gid = MAP_DATA[y * MAP_WIDTH + x] & 0x3FFFFFFF
-            tile_name = TILE_GIDS.get(tile_gid)
-
-            if tile_name in TILE_GIDS_COLISION.values():
-                tile_rect = rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-                if player_collision_check_rect_x.colliderect(tile_rect):
-                    player.x = old_player_x
+    if not collision_check.collision_check(player.x, player.y):
+        player.x = old_player_x
 
     if keyboard.down:
         player.y += 1
@@ -122,22 +104,8 @@ def update():
         player.y -= 1
         player_walking = True
 
-    player_collision_check_rect_y = rect(
-        player.x + PLAYER_COLISION_OFFSET_X - (PLAYER_COLISION_WIDTH / 2),
-        player.y + PLAYER_COLISION_OFFSET_Y - (PLAYER_COLISION_HEIGHT / 2),
-        PLAYER_COLISION_WIDTH,
-        PLAYER_COLISION_HEIGHT,
-    )
-
-    for y in range(MAP_HEIGHT):
-        for x in range(MAP_WIDTH):
-            tile_gid = MAP_DATA[y * MAP_WIDTH + x] & 0x3FFFFFFF
-            tile_name = TILE_GIDS.get(tile_gid)
-
-            if tile_name in TILE_GIDS_COLISION.values():
-                tile_rect = rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-                if player_collision_check_rect_y.colliderect(tile_rect):
-                    player.y = old_player_y
+    if not collision_check(player.x, player.y):
+        player.y = old_player_y
 
     animation_timer += 1 / 60
 
