@@ -49,6 +49,13 @@ player_attack_sprites = [
     Actor("player_attacking_4"),
 ]
 
+player_dying_sprites = [
+    Actor("player_dying_1"),
+    Actor("player_dying_2"),
+    Actor("player_dying_3"),
+    Actor("player_dying_4"),
+]
+
 current_animation_sprites = player_idle_sprites
 current_sprite_index = 0
 animation_timer = 0.0
@@ -57,6 +64,7 @@ animation_speed_walk = 0.1
 
 animation_speed_attack = 0.1
 player_attacking = False
+player_is_dead = False
 
 
 def init_game():
@@ -94,16 +102,30 @@ def player_attack_end():
     player_attacking = False
 
 
+def player_dying_end():
+    pass
+
+
 def update():
-    global current_animation_sprites, current_sprite_index, animation_timer, player_attacking
+    global current_animation_sprites, current_sprite_index, animation_timer, player_attacking, player_is_dead
 
     old_player_x = player.x
     old_player_y = player.y
 
     player_walking = False
 
-    if player_attacking:
+    if player_is_dead:
         pass
+    elif player_attacking:
+        pass
+    # >>> CONDIÇÃO TEMPORARIA <<<
+    elif keyboard.k:
+        player_is_dead = True
+        player_attacking = False
+        player_walking = False
+        current_animation_sprites = player_dying_sprites
+        current_sprite_index = 0
+        animation_timer = 0.0
     elif keyboard.space:
         player_attacking = True
         player_walking = False
@@ -133,7 +155,10 @@ def update():
 
     animation_timer += 1 / 60
 
-    if player_attacking:
+    if player_is_dead:
+        speed_used = 0.2
+        current_animation_sprites = player_dying_sprites
+    elif player_attacking:
         speed_used = animation_speed_attack
     elif player_walking:
         current_animation_sprites = player_walk_sprites
@@ -148,8 +173,12 @@ def update():
 
         if current_animation_sprites == player_attack_sprites:
             if current_sprite_index >= len(player_attack_sprites):
-                current_sprite_index = len(current_animation_sprites) - 1
+                current_sprite_index = len(player_attack_sprites) - 1
                 player_attack_end()
+        elif current_animation_sprites == player_dying_sprites:
+            if current_sprite_index >= len(player_dying_sprites):
+                current_sprite_index = len(player_dying_sprites) - 1
+                player_dying_end()
         else:
             current_sprite_index %= len(current_animation_sprites)
 
