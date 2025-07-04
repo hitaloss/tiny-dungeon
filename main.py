@@ -1,47 +1,29 @@
 import pgzrun
 from pgzero.actor import Actor
+from pgzero.keyboard import keyboard
+
 
 # A excessão que foi passada no teste
 from pygame import Rect as rect
 
 from config import (
-    DIR_NONE,
     DIR_LEFT,
     DIR_RIGHT,
     DIR_UP,
     DIR_DOWN,
-    ANIMATION_SPEED_IDLE,
-    ANIMATION_SPEED_WALK,
-    ANIMATION_SPEED_ATTACK,
 )
 
 from map.game_map import (
     MAP_WIDTH,
     MAP_HEIGHT,
     TILE_GIDS,
-    TILE_GIDS_COLISION,
     TILE_SIZE,
     MAP_DATA,
 )
 
 
 from sprites.player_sprites import (
-    player_idle_sprites,
-    player_idle_left_sprites,
-    player_idle_up_sprites,
     player_idle_down_sprites,
-    player_walk_sprites,
-    player_walk_left_sprites,
-    player_walk_up_sprites,
-    player_walk_down_sprites,
-    player_attack_sprites,
-    player_attack_left_sprites,
-    player_attack_up_sprites,
-    player_attack_down_sprites,
-    player_dying_sprites,
-    player_dying_left_sprites,
-    player_dying_up_sprites,
-    player_dying_down_sprites,
 )
 from utils import collision_check
 from utils.animation_manager import update_player_animation
@@ -58,7 +40,6 @@ tiles = {}
 player = None
 
 
-DIR_NONE = 0
 DIR_LEFT = 1
 DIR_RIGHT = 2
 DIR_UP = 3
