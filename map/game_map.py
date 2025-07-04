@@ -121,11 +121,11 @@ TILE_GIDS_COLISION = {
     or "cart" in tile_name
     or "grave" in tile_name
     or "door" in tile_name
-    or "enemy" in tile_name
     or "chest" in tile_name
     or "box" in tile_name
     or "barrel" in tile_name
     or "fence" in tile_name
+    or "skeleton" in tile_name
 }
 
 MAP_DATA = [
