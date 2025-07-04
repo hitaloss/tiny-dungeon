@@ -12,6 +12,11 @@ from config import (
     DIR_UP,
     DIR_DOWN,
     SKELETON_PATROL_DISTANCE,
+    SKELETON_ATTACK_SPEED,
+    SKELETON_HIT_DELAY,
+    SKELETON_ATTACK_RANGE_OFFSET_X,
+    SKELETON_ATTACK_RANGE_WIDTH,
+    SKELETON_ATTACK_COOLDOWN,
 )
 from utils import collision_check
 from utils.player_animation_manager import update_player_animation
@@ -25,15 +30,21 @@ from map.game_map import (
     MAP_DATA,
 )
 
+from sprites.player_sprites import player_idle_down_sprites
 
-from sprites.player_sprites import (
-    player_idle_down_sprites,
+from sprites.skeleton_sprites import (
+    skeleton_idle_sprites,
+    skeleton_idle_left_sprites,
+    skeleton_walk_sprites,
+    skeleton_walk_left_sprites,
+    skeleton_attack_sprites,
+    skeleton_attack_left_sprites,
+    skeleton_dying_sprites,
+    skeleton_dying_left_sprites,
 )
 
-from sprites.skeleton_sprites import skeleton_idle_sprites
-
 WIDTH = 800
-HEIGHT = 600
+HEIGHT = 650
 TITLE = "Tiny Dungeon"
 
 BLACK = (0, 0, 0)
@@ -62,6 +73,11 @@ skeleton_patrol_end_x = 0
 skeleton_moving_right = True
 skeleton_is_patrolling = True
 skeleton_idle_timer = 0
+
+skeleton_is_attacking = False
+skeleton_attack_hit_timer = 0.0
+skeleton_hit_applied = False
+skeleton_attack_cooldown_timer = 0.0
 
 
 def init_game():
@@ -120,9 +136,18 @@ def player_dying_end():
     pass
 
 
+def skeleton_attack_end_callback():
+    global skeleton_is_attacking, skeleton_hit_applied, skeleton_is_patrolling, skeleton_attack_cooldown_timer
+    skeleton_is_attacking = False
+    skeleton_hit_applied = False
+    skeleton_is_patrolling = True
+    skeleton_attack_cooldown_timer = SKELETON_ATTACK_COOLDOWN
+
+
 def update():
     global current_player_animation_sprites, current_sprite_index, animation_timer, player_attacking, player_is_dead, player_last_direction
     global skeleton_current_animation_sprites, skeleton_current_frame_index, skeleton_animation_timer, skeleton_moving_right, skeleton_is_patrolling, skeleton_idle_timer
+    global skeleton_is_attacking, skeleton_attack_hit_timer, skeleton_hit_applied, skeleton_attack_cooldown_timer
 
     old_player_x = player.x
     old_player_y = player.y
@@ -192,17 +217,27 @@ def update():
         skeleton_moving_right,
         skeleton_is_patrolling,
         skeleton_idle_timer,
+        skeleton_is_attacking,
+        skeleton_attack_hit_timer,
+        skeleton_hit_applied,
+        skeleton_attack_cooldown_timer,
     ) = update_skeleton_state_and_animation(
         skeleton_obj=skeleton,
+        player_obj=player,
         alt_time=1 / 60.0,
         patrol_start_x=skeleton_patrol_start_x,
         patrol_end_x=skeleton_patrol_end_x,
         current_direction_is_right=skeleton_moving_right,
         is_patrolling=skeleton_is_patrolling,
         idle_timer=skeleton_idle_timer,
+        is_attacking=skeleton_is_attacking,
+        attack_hit_timer=skeleton_attack_hit_timer,
+        hit_applied=skeleton_hit_applied,
+        attack_cooldown_timer=skeleton_attack_cooldown_timer,
         current_sprites_list=skeleton_current_animation_sprites,
         current_sprite_index=skeleton_current_frame_index,
         animation_timer=skeleton_animation_timer,
+        on_attack_end_callback=skeleton_attack_end_callback,
     )
 
 
