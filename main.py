@@ -19,6 +19,8 @@ WIDTH = 800
 HEIGHT = 640
 TITLE = "Tiny Dungeon"
 MAP_BACKGROUND = (234, 165, 108)
+YELLOW = (255, 255, 0)
+BLACK = (0, 0, 0)
 
 
 tiles = {}
@@ -123,6 +125,16 @@ def draw():
         coin.draw()
     for skeleton_dict in skeletons:
         skeleton_dict["actor"].draw()
+
+    text = f"Moedas: {coins_collected}/{TOTAL_COINS}"
+    screen.draw.text(
+        text,
+        bottomright=(WIDTH - 15, HEIGHT - 15),
+        fontsize=30,
+        color=YELLOW,
+        ocolor=BLACK,
+        owidth=1.5,
+    )
 
 
 def player_attack_end():
