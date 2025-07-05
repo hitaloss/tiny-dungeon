@@ -78,6 +78,8 @@ skeleton_is_attacking = False
 skeleton_attack_hit_timer = 0.0
 skeleton_hit_applied = False
 skeleton_attack_cooldown_timer = 0.0
+skeleton_is_dead = False
+skeleton_despawn_timer = 0.0
 
 
 def init_game():
@@ -147,7 +149,8 @@ def skeleton_attack_end_callback():
 def update():
     global current_player_animation_sprites, current_sprite_index, animation_timer, player_attacking, player_is_dead, player_last_direction
     global skeleton_current_animation_sprites, skeleton_current_frame_index, skeleton_animation_timer, skeleton_moving_right, skeleton_is_patrolling, skeleton_idle_timer
-    global skeleton_is_attacking, skeleton_attack_hit_timer, skeleton_hit_applied, skeleton_attack_cooldown_timer
+    global skeleton, skeleton_is_dead, skeleton_despawn_timer, skeleton_is_attacking, skeleton_attack_hit_timer, skeleton_hit_applied, skeleton_attack_cooldown_timer
+    global player_is_dead, player_was_hit
 
     old_player_x = player.x
     old_player_y = player.y
@@ -158,13 +161,6 @@ def update():
         pass
     elif player_attacking:
         pass
-    # >>> CONDIÇÃO TEMPORARIA <<<
-    elif keyboard.k:
-        player_is_dead = True
-        player_attacking = False
-        player_walking = False
-        current_sprite_index = 0
-        animation_timer = 0.0
     elif keyboard.space:
         player_attacking = True
         player_walking = False
@@ -179,7 +175,8 @@ def update():
             player.x += 1
             player_walking = True
             player_last_direction = DIR_RIGHT
-        if not collision_check.collision_check(player.x, player.y):
+
+        if not collision_check.collision_check(player.x, player.y, skeleton):
             player.x = old_player_x
 
         if keyboard.down:
@@ -191,7 +188,7 @@ def update():
             player_walking = True
             player_last_direction = DIR_UP
 
-        if not collision_check.collision_check(player.x, player.y):
+        if not collision_check.collision_check(player.x, player.y, skeleton):
             player.y = old_player_y
 
     current_player_animation_sprites, current_sprite_index, animation_timer = (
@@ -210,6 +207,33 @@ def update():
         )
     )
 
+    if player_attacking and skeleton and not skeleton_is_dead:
+        attack_hitbox = rect(0, 0, TILE_SIZE, TILE_SIZE)
+        if player_last_direction == DIR_RIGHT:
+            attack_hitbox.midleft = player.midright
+        elif player_last_direction == DIR_LEFT:
+            attack_hitbox.midright = player.midleft
+        elif player_last_direction == DIR_UP:
+            attack_hitbox.midbottom = player.midtop
+        elif player_last_direction == DIR_DOWN:
+            attack_hitbox.midtop = player.midbottom
+
+        skeleton_hitbox = rect(0, 0, 10, 14)
+        skeleton_hitbox.center = skeleton.center
+
+        if attack_hitbox.colliderect(skeleton_hitbox):
+            skeleton_is_dead = True
+            skeleton_current_frame_index = 0
+            skeleton_animation_timer = 0.0
+
+    if skeleton_despawn_timer > 0:
+        skeleton_despawn_timer -= 1 / 60.0
+        if skeleton_despawn_timer <= 0:
+            skeleton = None
+
+    if not skeleton:
+        return
+
     (
         skeleton_current_animation_sprites,
         skeleton_current_frame_index,
@@ -221,6 +245,8 @@ def update():
         skeleton_attack_hit_timer,
         skeleton_hit_applied,
         skeleton_attack_cooldown_timer,
+        player_was_hit,
+        start_despawn_timer,
     ) = update_skeleton_state_and_animation(
         skeleton_obj=skeleton,
         player_obj=player,
@@ -231,6 +257,7 @@ def update():
         is_patrolling=skeleton_is_patrolling,
         idle_timer=skeleton_idle_timer,
         is_attacking=skeleton_is_attacking,
+        is_dead=skeleton_is_dead,
         attack_hit_timer=skeleton_attack_hit_timer,
         hit_applied=skeleton_hit_applied,
         attack_cooldown_timer=skeleton_attack_cooldown_timer,
@@ -239,6 +266,16 @@ def update():
         animation_timer=skeleton_animation_timer,
         on_attack_end_callback=skeleton_attack_end_callback,
     )
+
+    if start_despawn_timer:
+        skeleton_despawn_timer = 1.0
+
+    if player_was_hit and not player_is_dead:
+        player_is_dead = True
+        player_attacking = False
+        player_walking = False
+        current_sprite_index = 0
+        animation_timer = 0.0
 
 
 init_game()

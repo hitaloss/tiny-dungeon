@@ -10,21 +10,22 @@ from map.game_map import (
 )
 
 from config import (
+    PLAYER_COLISION_WIDTH,
     PLAYER_COLISION_HEIGHT,
     PLAYER_COLISION_OFFSET_X,
     PLAYER_COLISION_OFFSET_Y,
-    PLAYER_COLISION_WIDTH,
+    SKELETON_COLISION_WIDTH,
+    SKELETON_COLISION_HEIGHT,
+    SKELETON_COLISION_OFFSET_X,
+    SKELETON_COLISION_OFFSET_Y,
 )
 
 
-def collision_check(x_player_position, y_player_position):
+def collision_check(x_player_position, y_player_position, skeleton_obj):
 
-    collision_check_rect = rect(
-        x_player_position + PLAYER_COLISION_OFFSET_X - (PLAYER_COLISION_WIDTH / 2),
-        y_player_position + PLAYER_COLISION_OFFSET_Y - (PLAYER_COLISION_HEIGHT / 2),
-        PLAYER_COLISION_WIDTH,
-        PLAYER_COLISION_HEIGHT,
-    )
+    player_hitbox = rect(0, 0, PLAYER_COLISION_WIDTH, PLAYER_COLISION_HEIGHT)
+    player_hitbox.center = (x_player_position, y_player_position)
+    player_hitbox.move_ip(PLAYER_COLISION_OFFSET_X, PLAYER_COLISION_OFFSET_Y)
 
     for y_tile in range(MAP_HEIGHT):
         for x_tile in range(MAP_WIDTH):
@@ -35,6 +36,15 @@ def collision_check(x_player_position, y_player_position):
                 tile_rect = rect(
                     x_tile * TILE_SIZE, y_tile * TILE_SIZE, TILE_SIZE, TILE_SIZE
                 )
-                if collision_check_rect.colliderect(tile_rect):
+                if player_hitbox.colliderect(tile_rect):
                     return False
+
+    if skeleton_obj:
+        skeleton_hitbox = rect(0, 0, SKELETON_COLISION_WIDTH, SKELETON_COLISION_HEIGHT)
+        skeleton_hitbox.center = skeleton_obj.center
+        skeleton_hitbox.move_ip(SKELETON_COLISION_OFFSET_X, SKELETON_COLISION_OFFSET_Y)
+
+        if player_hitbox.colliderect(skeleton_hitbox):
+            return False
+
     return True
