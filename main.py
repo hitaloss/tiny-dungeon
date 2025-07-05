@@ -2,7 +2,6 @@ import pgzrun
 from pgzero.actor import Actor
 from pgzero.keyboard import keyboard
 
-
 # A excessão que foi passada no teste
 from pygame import Rect as rect
 
@@ -12,11 +11,9 @@ from config import (
     DIR_UP,
     DIR_DOWN,
     SKELETON_PATROL_DISTANCE,
-    SKELETON_ATTACK_SPEED,
-    SKELETON_HIT_DELAY,
-    SKELETON_ATTACK_RANGE_OFFSET_X,
-    SKELETON_ATTACK_RANGE_WIDTH,
     SKELETON_ATTACK_COOLDOWN,
+    TOTAL_COINS,
+    ANIMATION_SPEED_COIN,
 )
 from utils import collision_check
 from utils.player_animation_manager import update_player_animation
@@ -29,19 +26,9 @@ from map.game_map import (
     TILE_SIZE,
     MAP_DATA,
 )
-
 from sprites.player_sprites import player_idle_down_sprites
-
-from sprites.skeleton_sprites import (
-    skeleton_idle_sprites,
-    skeleton_idle_left_sprites,
-    skeleton_walk_sprites,
-    skeleton_walk_left_sprites,
-    skeleton_attack_sprites,
-    skeleton_attack_left_sprites,
-    skeleton_dying_sprites,
-    skeleton_dying_left_sprites,
-)
+from sprites.skeleton_sprites import skeleton_idle_sprites
+from sprites.coin_sprites import coin_sprites
 
 WIDTH = 800
 HEIGHT = 650
@@ -81,9 +68,16 @@ skeleton_attack_cooldown_timer = 0.0
 skeleton_is_dead = False
 skeleton_despawn_timer = 0.0
 
+coins = []
+coin_current_sprite_index = 0
+coin_animation_timer = 0.0
+coins_collected = 0
+game_won = False
+
 
 def init_game():
     global player, current_player_animation_sprites, skeleton, skeleton_patrol_start_x, skeleton_patrol_end_x, skeleton_current_animation_sprites
+    global coins, coins_collected, game_won
 
     player = current_player_animation_sprites[0]
     player.pos = (WIDTH // 2, HEIGHT // 2)
@@ -109,9 +103,34 @@ def init_game():
 
     skeleton_current_animation_sprites = skeleton_idle_sprites
 
+    coins.clear()
+    coins_collected = 0
+    game_won = False
+
+    coins_positions = [
+        (3, 2),
+        (9, 23),
+        (9, 35),
+        (21, 36),
+        (32, 8),
+        (37, 22),
+        (45, 9),
+    ]
+
+    for pos in coins_positions:
+        coin = Actor("coin_1")
+        coin.pos = (
+            pos[0] * TILE_SIZE + TILE_SIZE // 2,
+            pos[1] * TILE_SIZE + TILE_SIZE // 2,
+        )
+        coins.append(coin)
+
 
 def draw():
     screen.fill(MAP_BACKGROUND)
+
+    if skeleton:
+        skeleton.draw()
 
     for y in range(MAP_HEIGHT):
         for x in range(MAP_WIDTH):
@@ -124,6 +143,9 @@ def draw():
                 tile_actor = tiles[tile_name]
                 tile_actor.topleft = (x * TILE_SIZE, y * TILE_SIZE)
                 tile_actor.draw()
+
+    for coin in coins:
+        coin.draw()
 
     player.draw()
     skeleton.draw()
@@ -146,11 +168,53 @@ def skeleton_attack_end_callback():
     skeleton_attack_cooldown_timer = SKELETON_ATTACK_COOLDOWN
 
 
+def update_coin_animation():
+    global coin_animation_timer, coin_current_sprite_index
+
+    coin_animation_timer += 1 / 60.0
+
+    if coin_animation_timer >= ANIMATION_SPEED_COIN:
+        coin_animation_timer = 0
+        coin_current_sprite_index = (coin_current_sprite_index + 1) % len(coin_sprites)
+
+    new_coin_image = coin_sprites[coin_current_sprite_index].image
+    for coin in coins:
+        coin.image = new_coin_image
+
+
 def update():
     global current_player_animation_sprites, current_sprite_index, animation_timer, player_attacking, player_is_dead, player_last_direction
     global skeleton_current_animation_sprites, skeleton_current_frame_index, skeleton_animation_timer, skeleton_moving_right, skeleton_is_patrolling, skeleton_idle_timer
     global skeleton, skeleton_is_dead, skeleton_despawn_timer, skeleton_is_attacking, skeleton_attack_hit_timer, skeleton_hit_applied, skeleton_attack_cooldown_timer
     global player_is_dead, player_was_hit
+    global coins_collected, game_won
+
+    if game_won:
+        return
+
+    update_coin_animation()
+
+    for coin in reversed(coins):
+        if player.colliderect(coin):
+            coins.remove(coin)
+            coins_collected += 1
+            print(f"Moedas coletadas: {coins_collected}/{TOTAL_COINS}")
+
+    if coins_collected >= TOTAL_COINS:
+        player_tile_x = int(player.x // TILE_SIZE)
+        player_tile_y = int(player.y // TILE_SIZE)
+
+        if (player_tile_x, player_tile_y) == (14, 10) or (
+            player_tile_x,
+            player_tile_y,
+        ) == (15, 10):
+            game_won = True
+            print("Vitoria")
+
+        tile_gid = MAP_DATA[player_tile_y * MAP_WIDTH + player_tile_x] & 0x3FFFFFFF
+
+        if tile_gid == 2:
+            game_won = True
 
     old_player_x = player.x
     old_player_y = player.y
