@@ -16,7 +16,7 @@ from sprites.skeleton_sprites import *
 from sprites.coin_sprites import coin_sprites
 
 WIDTH = 800
-HEIGHT = 650
+HEIGHT = 640
 TITLE = "Tiny Dungeon"
 MAP_BACKGROUND = (234, 165, 108)
 
@@ -96,7 +96,7 @@ def init_game():
     coins.clear()
     coins_collected = 0
     game_won = False
-    coin_positions = [(3, 3), (3, 21), (27, 7), (35, 38), (45, 35), (47, 8), (39, 38)]
+    coin_positions = [(3, 3), (3, 21), (27, 7), (13, 28), (19, 27), (47, 8), (24, 35)]
     for pos in coin_positions:
         coin = Actor("coin_1")
         coin.pos = (
@@ -175,22 +175,22 @@ def update():
     player_walking = False
     if not player_attacking:
         if keyboard.left:
-            player.x -= 2
+            player.x -= 1.2
             player_walking = True
             player_last_direction = DIR_LEFT
         if keyboard.right:
-            player.x += 2
+            player.x += 1.2
             player_walking = True
             player_last_direction = DIR_RIGHT
         if not collision_check(player.x, player.y, skeletons):
             player.x = old_player_x
 
         if keyboard.up:
-            player.y -= 2
+            player.y -= 1.2
             player_walking = True
             player_last_direction = DIR_UP
         if keyboard.down:
-            player.y += 2
+            player.y += 1.2
             player_walking = True
             player_last_direction = DIR_DOWN
         if not collision_check(player.x, player.y, skeletons):
