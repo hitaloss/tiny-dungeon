@@ -1,3 +1,4 @@
+import random
 import pgzrun
 from pgzero.actor import Actor
 from pgzero.keyboard import keyboard
@@ -52,18 +53,19 @@ def init_game():
 
     skeletons.clear()
     skeleton_positions = [
-        (3, 2),
-        (2, 38),
-        (9, 23),
-        (9, 35),
-        (21, 36),
+        (4, 2),
+        (4, 21),
+        (10, 22),
+        (12, 14),
+        (12, 34),
+        (18, 37),
+        (21, 24),
+        (30, 25),
         (30, 8),
-        (34, 22),
-        (44, 9),
-        (41, 23),
-        (18, 18),
-        (34, 15),
-        (24, 2),
+        (30, 37),
+        (34, 14),
+        (40, 22),
+        (46, 9),
     ]
     for pos in skeleton_positions:
         actor = Actor("skeleton_idle_1")
@@ -94,7 +96,7 @@ def init_game():
     coins.clear()
     coins_collected = 0
     game_won = False
-    coin_positions = [(9, 23), (15, 5), (25, 10), (40, 8), (45, 35), (10, 38), (30, 25)]
+    coin_positions = [(3, 3), (3, 21), (27, 7), (35, 38), (45, 35), (47, 8), (39, 38)]
     for pos in coin_positions:
         coin = Actor("coin_1")
         coin.pos = (
@@ -148,8 +150,11 @@ def update():
     global player_current_sprite_index, player_animation_timer, current_player_animation_sprites
     global coins_collected, game_won
 
-    if game_won or player_is_dead:
-        return
+    if game_won:
+        pass
+
+    if player_is_dead:
+        pass
 
     update_coin_animation()
 
@@ -201,7 +206,7 @@ def update():
         attack_hitbox.center = player.center
         for skeleton_dict in skeletons:
             if not skeleton_dict["is_dead"] and attack_hitbox.colliderect(
-                skeleton_dict["actor"]
+                skeleton_dict["actor"]._rect
             ):
                 skeleton_dict.update(
                     {"is_dead": True, "current_sprite_index": 0, "animation_timer": 0.0}
@@ -345,7 +350,7 @@ def update():
                     }
                 )
 
-            skeleton_dict["idle_timer"] += 1 / 60.0
+            skeleton_dict["idle_timer"] += round(random.uniform(0.01, 2.0), 10) / 60.0
             if skeleton_dict["idle_timer"] >= SKELETON_IDLE_DURATION:
                 skeleton_dict["is_patrolling"] = True
                 skeleton_dict["moving_right"] = not skeleton_dict["moving_right"]
