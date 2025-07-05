@@ -212,6 +212,8 @@ def update():
         if skeleton_dict["is_dead"]:
             if skeleton_dict["despawn_timer"] > 0:
                 skeleton_dict["despawn_timer"] -= 1 / 60.0
+                if skeleton_dict["despawn_timer"] <= 0:
+                    skeleton_dict["remove_me"] = True
             else:
                 current_list = (
                     skeleton_dying_sprites
@@ -223,15 +225,16 @@ def update():
                         {
                             "current_sprites_list": current_list,
                             "current_sprite_index": 0,
-                            "animation_timer": 0,
+                            "animation_timer": 0.0,
                         }
                     )
+
                 skeleton_dict["animation_timer"] += 1 / 60.0
                 if skeleton_dict["animation_timer"] >= 0.1:
                     skeleton_dict["animation_timer"] = 0
                     if skeleton_dict["current_sprite_index"] < len(current_list) - 1:
                         skeleton_dict["current_sprite_index"] += 1
-                    else:
+                    elif skeleton_dict["despawn_timer"] <= 0:
                         skeleton_dict["despawn_timer"] = 1.0
             continue
 
@@ -253,22 +256,23 @@ def update():
                 skeleton_dict["actor"].height,
             )
         )
-        if (
+        can_see_player = (
             attack_zone.colliderect(player._rect)
             and abs(player.y - skeleton_dict["actor"].y) < TILE_SIZE
-            and skeleton_dict["attack_cooldown_timer"] <= 0
-        ):
-            if not skeleton_dict["is_attacking"]:
-                skeleton_dict.update(
-                    {
-                        "is_attacking": True,
-                        "is_patrolling": False,
-                        "attack_hit_timer": 0.0,
-                        "hit_applied": False,
-                        "current_sprite_index": 0,
-                        "animation_timer": 0.0,
-                    }
-                )
+        )
+        can_attack = skeleton_dict["attack_cooldown_timer"] <= 0
+
+        if can_see_player and can_attack and not skeleton_dict["is_attacking"]:
+            skeleton_dict.update(
+                {
+                    "is_attacking": True,
+                    "is_patrolling": False,
+                    "attack_hit_timer": 0.0,
+                    "hit_applied": False,
+                    "current_sprite_index": 0,
+                    "animation_timer": 0.0,
+                }
+            )
 
         if skeleton_dict["is_attacking"]:
             skeleton_dict["moving_right"] = player.x > skeleton_dict["actor"].x
@@ -285,28 +289,20 @@ def update():
                         "animation_timer": 0.0,
                     }
                 )
-            skeleton_dict["attack_hit_timer"] += 1 / 60.0
-            if (
-                skeleton_dict["attack_hit_timer"] >= SKELETON_HIT_DELAY
-                and not skeleton_dict["hit_applied"]
-            ):
-                attack_hitbox = rect(0, 0, SKELETON_ATTACK_RANGE_WIDTH, TILE_SIZE)
-                attack_hitbox.center = skeleton_dict["actor"].center
-                offset = (
-                    SKELETON_ATTACK_RANGE_OFFSET_X
-                    if skeleton_dict["moving_right"]
-                    else -SKELETON_ATTACK_RANGE_OFFSET_X
-                )
-                attack_hitbox.x += offset
-                if player.colliderect(attack_hitbox):
-                    player_was_hit = True
-                skeleton_dict["hit_applied"] = True
-            if (
-                skeleton_dict["animation_timer"] >= SKELETON_ATTACK_SPEED
-                and skeleton_dict["current_sprite_index"] == len(current_list) - 1
-            ):
-                skeleton_dict["is_attacking"] = False
-                skeleton_dict["attack_cooldown_timer"] = SKELETON_ATTACK_COOLDOWN
+
+            if skeleton_dict["attack_hit_timer"] < SKELETON_HIT_DELAY:
+                skeleton_dict["attack_hit_timer"] += 1 / 60.0
+                if skeleton_dict["attack_hit_timer"] >= SKELETON_HIT_DELAY:
+                    attack_hitbox = rect(0, 0, SKELETON_ATTACK_RANGE_WIDTH, TILE_SIZE)
+                    attack_hitbox.center = skeleton_dict["actor"].center
+                    offset = (
+                        SKELETON_ATTACK_RANGE_OFFSET_X
+                        if skeleton_dict["moving_right"]
+                        else -SKELETON_ATTACK_RANGE_OFFSET_X
+                    )
+                    attack_hitbox.x += offset
+                    if player.colliderect(attack_hitbox):
+                        player_was_hit = True
 
         elif skeleton_dict["is_patrolling"]:
             current_list = (
@@ -322,6 +318,7 @@ def update():
                         "animation_timer": 0.0,
                     }
                 )
+
             if skeleton_dict["moving_right"]:
                 skeleton_dict["actor"].x += SKELETON_WALK_SPEED
                 if skeleton_dict["actor"].x >= skeleton_dict["patrol_end_x"]:
@@ -353,36 +350,45 @@ def update():
                 skeleton_dict["is_patrolling"] = True
                 skeleton_dict["moving_right"] = not skeleton_dict["moving_right"]
 
-    for skeleton_dict in reversed(skeletons):
-        if skeleton_dict["is_dead"]:
-            if (
-                skeleton_dict["despawn_timer"] > 0
-                and skeleton_dict["despawn_timer"] - 1 / 60.0 <= 0
-            ):
-                skeletons.remove(skeleton_dict)
-            else:
-                skeleton_dict["despawn_timer"] -= 1 / 60.0
-            continue
-
         skeleton_dict["animation_timer"] += 1 / 60.0
-        speed = 0.2
+
+        speed = ANIMATION_SPEED_IDLE
         if skeleton_dict["is_patrolling"]:
-            speed = 0.1
+            speed = ANIMATION_SPEED_WALK
         if skeleton_dict["is_attacking"]:
             speed = SKELETON_ATTACK_SPEED
 
-        current_list = skeleton_dict["current_sprites_list"]
         if skeleton_dict["animation_timer"] >= speed:
             skeleton_dict["animation_timer"] = 0
+            current_list = skeleton_dict["current_sprites_list"]
             if len(current_list) > 0:
                 skeleton_dict["current_sprite_index"] = (
                     skeleton_dict["current_sprite_index"] + 1
                 ) % len(current_list)
 
+                if (
+                    skeleton_dict["is_attacking"]
+                    and skeleton_dict["current_sprite_index"] == 0
+                ):
+                    skeleton_dict["is_attacking"] = False
+                    skeleton_dict["attack_cooldown_timer"] = SKELETON_ATTACK_COOLDOWN
+                    skeleton_dict["is_patrolling"] = True
+
+    skeletons_to_keep = []
+    for skeleton_dict in skeletons:
+        if skeleton_dict.get("remove_me"):
+            continue
+
+        current_list = skeleton_dict["current_sprites_list"]
         if len(current_list) > 0:
+            skeleton_dict["current_sprite_index"] %= len(current_list)
             skeleton_dict["actor"].image = current_list[
                 skeleton_dict["current_sprite_index"]
             ].image
+
+        skeletons_to_keep.append(skeleton_dict)
+
+    skeletons[:] = skeletons_to_keep
 
     if player_was_hit and not player_is_dead:
         player_is_dead = True
