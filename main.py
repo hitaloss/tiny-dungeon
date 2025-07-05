@@ -1,123 +1,103 @@
+import random
 import pgzrun
 from pgzero.actor import Actor
 from pgzero.keyboard import keyboard
+from pygame.rect import Rect as rect
 
-# A excessão que foi passada no teste
-from pygame import Rect as rect
+# Unica exceção de import do pygame
 
-from config import (
-    DIR_LEFT,
-    DIR_RIGHT,
-    DIR_UP,
-    DIR_DOWN,
-    SKELETON_PATROL_DISTANCE,
-    SKELETON_ATTACK_COOLDOWN,
-    TOTAL_COINS,
-    ANIMATION_SPEED_COIN,
-)
-from utils import collision_check
+from config import *
+from utils.collision_check import collision_check
 from utils.player_animation_manager import update_player_animation
-from utils.skeleton_animation_manager import update_skeleton_state_and_animation
 
-from map.game_map import (
-    MAP_WIDTH,
-    MAP_HEIGHT,
-    TILE_GIDS,
-    TILE_SIZE,
-    MAP_DATA,
-)
+from map.game_map import MAP_WIDTH, MAP_HEIGHT, TILE_GIDS, TILE_SIZE, MAP_DATA
 from sprites.player_sprites import player_idle_down_sprites
-from sprites.skeleton_sprites import skeleton_idle_sprites
+from sprites.skeleton_sprites import *
 from sprites.coin_sprites import coin_sprites
 
 WIDTH = 800
 HEIGHT = 650
 TITLE = "Tiny Dungeon"
-
-BLACK = (0, 0, 0)
 MAP_BACKGROUND = (234, 165, 108)
 
-tiles = {}
 
+tiles = {}
 player = None
+skeletons = []
+coins = []
+game_won = False
+coins_collected = 0
+
 
 player_last_direction = DIR_DOWN
-
 current_player_animation_sprites = player_idle_down_sprites
-current_sprite_index = 0
-animation_timer = 0.0
-
+player_current_sprite_index = 0
+player_animation_timer = 0.0
 player_attacking = False
 player_is_dead = False
 
-skeleton = None
-skeleton_current_animation_sprites = None
-skeleton_current_frame_index = 0
-skeleton_animation_timer = 0.0
 
-skeleton_patrol_start_x = 0
-skeleton_patrol_end_x = 0
-skeleton_moving_right = True
-skeleton_is_patrolling = True
-skeleton_idle_timer = 0
-
-skeleton_is_attacking = False
-skeleton_attack_hit_timer = 0.0
-skeleton_hit_applied = False
-skeleton_attack_cooldown_timer = 0.0
-skeleton_is_dead = False
-skeleton_despawn_timer = 0.0
-
-coins = []
 coin_current_sprite_index = 0
 coin_animation_timer = 0.0
-coins_collected = 0
-game_won = False
 
 
 def init_game():
-    global player, current_player_animation_sprites, skeleton, skeleton_patrol_start_x, skeleton_patrol_end_x, skeleton_current_animation_sprites
-    global coins, coins_collected, game_won
+    global player, tiles, skeletons, coins, coins_collected, game_won, player_is_dead
 
-    player = current_player_animation_sprites[0]
+    player = Actor("player_idle_1")
     player.pos = (WIDTH // 2, HEIGHT // 2)
-    player.width = TILE_SIZE
-    player.height = TILE_SIZE
+    player_is_dead = False
 
     for tile_name in set(TILE_GIDS.values()):
         tiles[tile_name] = Actor(tile_name)
 
-    skeleton = skeleton_idle_sprites[0]
-    skeleton_initial_tile_x = (WIDTH // 2) // TILE_SIZE
-    skeleton_initial_tile_y = (HEIGHT // 2 + TILE_SIZE * 2) // TILE_SIZE
+    skeletons.clear()
+    skeleton_positions = [
+        (4, 2),
+        (4, 21),
+        (10, 22),
+        (12, 14),
+        (12, 34),
+        (18, 37),
+        (21, 24),
+        (30, 25),
+        (30, 8),
+        (30, 37),
+        (34, 14),
+        (40, 22),
+        (46, 9),
+    ]
+    for pos in skeleton_positions:
+        actor = Actor("skeleton_idle_1")
+        actor.pos = (
+            pos[0] * TILE_SIZE + TILE_SIZE // 2,
+            pos[1] * TILE_SIZE + TILE_SIZE // 2,
+        )
 
-    skeleton.pos = (
-        skeleton_initial_tile_x * TILE_SIZE + TILE_SIZE // 2,
-        skeleton_initial_tile_y * TILE_SIZE + TILE_SIZE // 2,
-    )
-    skeleton.width = TILE_SIZE
-    skeleton.height = TILE_SIZE
-
-    skeleton_patrol_start_x = skeleton.x - SKELETON_PATROL_DISTANCE / 2
-    skeleton_patrol_end_x = skeleton.x + SKELETON_PATROL_DISTANCE / 2
-
-    skeleton_current_animation_sprites = skeleton_idle_sprites
+        skeleton_dict = {
+            "actor": actor,
+            "patrol_start_x": actor.x - SKELETON_PATROL_DISTANCE / 2,
+            "patrol_end_x": actor.x + SKELETON_PATROL_DISTANCE / 2,
+            "moving_right": True,
+            "is_patrolling": True,
+            "is_attacking": False,
+            "is_dead": False,
+            "hit_applied": False,
+            "despawn_timer": 0.0,
+            "idle_timer": 0.0,
+            "attack_hit_timer": 0.0,
+            "attack_cooldown_timer": SKELETON_ATTACK_COOLDOWN,
+            "animation_timer": 0.0,
+            "current_sprite_index": 0,
+            "current_sprites_list": skeleton_idle_sprites,
+        }
+        skeletons.append(skeleton_dict)
 
     coins.clear()
     coins_collected = 0
     game_won = False
-
-    coins_positions = [
-        (3, 2),
-        (9, 23),
-        (9, 35),
-        (21, 36),
-        (32, 8),
-        (37, 22),
-        (45, 9),
-    ]
-
-    for pos in coins_positions:
+    coin_positions = [(3, 3), (3, 21), (27, 7), (35, 38), (45, 35), (47, 8), (39, 38)]
+    for pos in coin_positions:
         coin = Actor("coin_1")
         coin.pos = (
             pos[0] * TILE_SIZE + TILE_SIZE // 2,
@@ -129,26 +109,20 @@ def init_game():
 def draw():
     screen.fill(MAP_BACKGROUND)
 
-    if skeleton:
-        skeleton.draw()
-
     for y in range(MAP_HEIGHT):
         for x in range(MAP_WIDTH):
-            tile_gid_original = MAP_DATA[y * MAP_WIDTH + x]
-            tile_gid = tile_gid_original & 0x3FFFFFFF
-
+            tile_gid = MAP_DATA[y * MAP_WIDTH + x] & 0x3FFFFFFF
             tile_name = TILE_GIDS.get(tile_gid)
-
             if tile_name:
                 tile_actor = tiles[tile_name]
                 tile_actor.topleft = (x * TILE_SIZE, y * TILE_SIZE)
                 tile_actor.draw()
 
+    player.draw()
     for coin in coins:
         coin.draw()
-
-    player.draw()
-    skeleton.draw()
+    for skeleton_dict in skeletons:
+        skeleton_dict["actor"].draw()
 
 
 def player_attack_end():
@@ -160,37 +134,27 @@ def player_dying_end():
     pass
 
 
-def skeleton_attack_end_callback():
-    global skeleton_is_attacking, skeleton_hit_applied, skeleton_is_patrolling, skeleton_attack_cooldown_timer
-    skeleton_is_attacking = False
-    skeleton_hit_applied = False
-    skeleton_is_patrolling = True
-    skeleton_attack_cooldown_timer = SKELETON_ATTACK_COOLDOWN
-
-
 def update_coin_animation():
     global coin_animation_timer, coin_current_sprite_index
-
     coin_animation_timer += 1 / 60.0
-
     if coin_animation_timer >= ANIMATION_SPEED_COIN:
         coin_animation_timer = 0
         coin_current_sprite_index = (coin_current_sprite_index + 1) % len(coin_sprites)
-
     new_coin_image = coin_sprites[coin_current_sprite_index].image
     for coin in coins:
         coin.image = new_coin_image
 
 
 def update():
-    global current_player_animation_sprites, current_sprite_index, animation_timer, player_attacking, player_is_dead, player_last_direction
-    global skeleton_current_animation_sprites, skeleton_current_frame_index, skeleton_animation_timer, skeleton_moving_right, skeleton_is_patrolling, skeleton_idle_timer
-    global skeleton, skeleton_is_dead, skeleton_despawn_timer, skeleton_is_attacking, skeleton_attack_hit_timer, skeleton_hit_applied, skeleton_attack_cooldown_timer
-    global player_is_dead, player_was_hit
+    global player_last_direction, player_attacking, player_is_dead
+    global player_current_sprite_index, player_animation_timer, current_player_animation_sprites
     global coins_collected, game_won
 
     if game_won:
-        return
+        pass
+
+    if player_is_dead:
+        pass
 
     update_coin_animation()
 
@@ -203,145 +167,255 @@ def update():
     if coins_collected >= TOTAL_COINS:
         player_tile_x = int(player.x // TILE_SIZE)
         player_tile_y = int(player.y // TILE_SIZE)
-
-        if (player_tile_x, player_tile_y) == (14, 10) or (
-            player_tile_x,
-            player_tile_y,
-        ) == (15, 10):
+        if (player_tile_x, player_tile_y) in [(14, 10), (15, 10)]:
             game_won = True
-            print("Vitoria")
+            print("VOCE VENCEU!!!")
 
-        tile_gid = MAP_DATA[player_tile_y * MAP_WIDTH + player_tile_x] & 0x3FFFFFFF
-
-        if tile_gid == 2:
-            game_won = True
-
-    old_player_x = player.x
-    old_player_y = player.y
-
+    old_player_x, old_player_y = player.x, player.y
     player_walking = False
-
-    if player_is_dead:
-        pass
-    elif player_attacking:
-        pass
-    elif keyboard.space:
-        player_attacking = True
-        player_walking = False
-        current_sprite_index = 0
-        animation_timer = 0.0
-    else:
+    if not player_attacking:
         if keyboard.left:
-            player.x -= 1
+            player.x -= 2
             player_walking = True
             player_last_direction = DIR_LEFT
         if keyboard.right:
-            player.x += 1
+            player.x += 2
             player_walking = True
             player_last_direction = DIR_RIGHT
-
-        if not collision_check.collision_check(player.x, player.y, skeleton):
+        if not collision_check(player.x, player.y, skeletons):
             player.x = old_player_x
 
-        if keyboard.down:
-            player.y += 1
-            player_walking = True
-            player_last_direction = DIR_DOWN
         if keyboard.up:
-            player.y -= 1
+            player.y -= 2
             player_walking = True
             player_last_direction = DIR_UP
-
-        if not collision_check.collision_check(player.x, player.y, skeleton):
+        if keyboard.down:
+            player.y += 2
+            player_walking = True
+            player_last_direction = DIR_DOWN
+        if not collision_check(player.x, player.y, skeletons):
             player.y = old_player_y
 
-    current_player_animation_sprites, current_sprite_index, animation_timer = (
-        update_player_animation(
-            player,
-            player_is_dead,
-            player_attacking,
-            player_walking,
-            player_last_direction,
-            1 / 60.0,
-            current_player_animation_sprites,
-            current_sprite_index,
-            animation_timer,
-            player_attack_end,
-            player_dying_end,
+        if keyboard.space:
+            player_attacking = True
+            player_walking = False
+            player_current_sprite_index = 0
+
+    if player_attacking:
+        attack_hitbox = rect(0, 0, TILE_SIZE + 4, TILE_SIZE + 4)
+        attack_hitbox.center = player.center
+        for skeleton_dict in skeletons:
+            if not skeleton_dict["is_dead"] and attack_hitbox.colliderect(
+                skeleton_dict["actor"]._rect
+            ):
+                skeleton_dict.update(
+                    {"is_dead": True, "current_sprite_index": 0, "animation_timer": 0.0}
+                )
+
+    player_was_hit = False
+    for skeleton_dict in skeletons:
+        if skeleton_dict["is_dead"]:
+            if skeleton_dict["despawn_timer"] > 0:
+                skeleton_dict["despawn_timer"] -= 1 / 60.0
+                if skeleton_dict["despawn_timer"] <= 0:
+                    skeleton_dict["remove_me"] = True
+            else:
+                current_list = (
+                    skeleton_dying_sprites
+                    if skeleton_dict["moving_right"]
+                    else skeleton_dying_left_sprites
+                )
+                if skeleton_dict["current_sprites_list"] is not current_list:
+                    skeleton_dict.update(
+                        {
+                            "current_sprites_list": current_list,
+                            "current_sprite_index": 0,
+                            "animation_timer": 0.0,
+                        }
+                    )
+
+                skeleton_dict["animation_timer"] += 1 / 60.0
+                if skeleton_dict["animation_timer"] >= 0.1:
+                    skeleton_dict["animation_timer"] = 0
+                    if skeleton_dict["current_sprite_index"] < len(current_list) - 1:
+                        skeleton_dict["current_sprite_index"] += 1
+                    elif skeleton_dict["despawn_timer"] <= 0:
+                        skeleton_dict["despawn_timer"] = 1.0
+            continue
+
+        if skeleton_dict["attack_cooldown_timer"] > 0:
+            skeleton_dict["attack_cooldown_timer"] -= 1 / 60.0
+
+        attack_zone = (
+            rect(
+                skeleton_dict["actor"].right,
+                skeleton_dict["actor"].top,
+                TILE_SIZE,
+                skeleton_dict["actor"].height,
+            )
+            if skeleton_dict["moving_right"]
+            else rect(
+                skeleton_dict["actor"].left - TILE_SIZE,
+                skeleton_dict["actor"].top,
+                TILE_SIZE,
+                skeleton_dict["actor"].height,
+            )
         )
-    )
+        can_see_player = (
+            attack_zone.colliderect(player._rect)
+            and abs(player.y - skeleton_dict["actor"].y) < TILE_SIZE
+        )
+        can_attack = skeleton_dict["attack_cooldown_timer"] <= 0
 
-    if player_attacking and skeleton and not skeleton_is_dead:
-        attack_hitbox = rect(0, 0, TILE_SIZE, TILE_SIZE)
-        if player_last_direction == DIR_RIGHT:
-            attack_hitbox.midleft = player.midright
-        elif player_last_direction == DIR_LEFT:
-            attack_hitbox.midright = player.midleft
-        elif player_last_direction == DIR_UP:
-            attack_hitbox.midbottom = player.midtop
-        elif player_last_direction == DIR_DOWN:
-            attack_hitbox.midtop = player.midbottom
+        if can_see_player and can_attack and not skeleton_dict["is_attacking"]:
+            skeleton_dict.update(
+                {
+                    "is_attacking": True,
+                    "is_patrolling": False,
+                    "attack_hit_timer": 0.0,
+                    "hit_applied": False,
+                    "current_sprite_index": 0,
+                    "animation_timer": 0.0,
+                }
+            )
 
-        skeleton_hitbox = rect(0, 0, 10, 14)
-        skeleton_hitbox.center = skeleton.center
+        if skeleton_dict["is_attacking"]:
+            skeleton_dict["moving_right"] = player.x > skeleton_dict["actor"].x
+            current_list = (
+                skeleton_attack_sprites
+                if skeleton_dict["moving_right"]
+                else skeleton_attack_left_sprites
+            )
+            if skeleton_dict["current_sprites_list"] is not current_list:
+                skeleton_dict.update(
+                    {
+                        "current_sprites_list": current_list,
+                        "current_sprite_index": 0,
+                        "animation_timer": 0.0,
+                    }
+                )
 
-        if attack_hitbox.colliderect(skeleton_hitbox):
-            skeleton_is_dead = True
-            skeleton_current_frame_index = 0
-            skeleton_animation_timer = 0.0
+            if skeleton_dict["attack_hit_timer"] < SKELETON_HIT_DELAY:
+                skeleton_dict["attack_hit_timer"] += 1 / 60.0
+                if skeleton_dict["attack_hit_timer"] >= SKELETON_HIT_DELAY:
+                    attack_hitbox = rect(0, 0, SKELETON_ATTACK_RANGE_WIDTH, TILE_SIZE)
+                    attack_hitbox.center = skeleton_dict["actor"].center
+                    offset = (
+                        SKELETON_ATTACK_RANGE_OFFSET_X
+                        if skeleton_dict["moving_right"]
+                        else -SKELETON_ATTACK_RANGE_OFFSET_X
+                    )
+                    attack_hitbox.x += offset
+                    if player.colliderect(attack_hitbox):
+                        player_was_hit = True
 
-    if skeleton_despawn_timer > 0:
-        skeleton_despawn_timer -= 1 / 60.0
-        if skeleton_despawn_timer <= 0:
-            skeleton = None
+        elif skeleton_dict["is_patrolling"]:
+            current_list = (
+                skeleton_walk_sprites
+                if skeleton_dict["moving_right"]
+                else skeleton_walk_left_sprites
+            )
+            if skeleton_dict["current_sprites_list"] is not current_list:
+                skeleton_dict.update(
+                    {
+                        "current_sprites_list": current_list,
+                        "current_sprite_index": 0,
+                        "animation_timer": 0.0,
+                    }
+                )
 
-    if not skeleton:
-        return
+            if skeleton_dict["moving_right"]:
+                skeleton_dict["actor"].x += SKELETON_WALK_SPEED
+                if skeleton_dict["actor"].x >= skeleton_dict["patrol_end_x"]:
+                    skeleton_dict["is_patrolling"] = False
+                    skeleton_dict["idle_timer"] = 0.0
+            else:
+                skeleton_dict["actor"].x -= SKELETON_WALK_SPEED
+                if skeleton_dict["actor"].x <= skeleton_dict["patrol_start_x"]:
+                    skeleton_dict["is_patrolling"] = False
+                    skeleton_dict["idle_timer"] = 0.0
 
-    (
-        skeleton_current_animation_sprites,
-        skeleton_current_frame_index,
-        skeleton_animation_timer,
-        skeleton_moving_right,
-        skeleton_is_patrolling,
-        skeleton_idle_timer,
-        skeleton_is_attacking,
-        skeleton_attack_hit_timer,
-        skeleton_hit_applied,
-        skeleton_attack_cooldown_timer,
-        player_was_hit,
-        start_despawn_timer,
-    ) = update_skeleton_state_and_animation(
-        skeleton_obj=skeleton,
-        player_obj=player,
-        alt_time=1 / 60.0,
-        patrol_start_x=skeleton_patrol_start_x,
-        patrol_end_x=skeleton_patrol_end_x,
-        current_direction_is_right=skeleton_moving_right,
-        is_patrolling=skeleton_is_patrolling,
-        idle_timer=skeleton_idle_timer,
-        is_attacking=skeleton_is_attacking,
-        is_dead=skeleton_is_dead,
-        attack_hit_timer=skeleton_attack_hit_timer,
-        hit_applied=skeleton_hit_applied,
-        attack_cooldown_timer=skeleton_attack_cooldown_timer,
-        current_sprites_list=skeleton_current_animation_sprites,
-        current_sprite_index=skeleton_current_frame_index,
-        animation_timer=skeleton_animation_timer,
-        on_attack_end_callback=skeleton_attack_end_callback,
-    )
+        else:
+            current_list = (
+                skeleton_idle_sprites
+                if skeleton_dict["moving_right"]
+                else skeleton_idle_left_sprites
+            )
+            if skeleton_dict["current_sprites_list"] is not current_list:
+                skeleton_dict.update(
+                    {
+                        "current_sprites_list": current_list,
+                        "current_sprite_index": 0,
+                        "animation_timer": 0.0,
+                    }
+                )
 
-    if start_despawn_timer:
-        skeleton_despawn_timer = 1.0
+            skeleton_dict["idle_timer"] += round(random.uniform(0.01, 2.0), 10) / 60.0
+            if skeleton_dict["idle_timer"] >= SKELETON_IDLE_DURATION:
+                skeleton_dict["is_patrolling"] = True
+                skeleton_dict["moving_right"] = not skeleton_dict["moving_right"]
+
+        skeleton_dict["animation_timer"] += 1 / 60.0
+
+        speed = ANIMATION_SPEED_IDLE
+        if skeleton_dict["is_patrolling"]:
+            speed = ANIMATION_SPEED_WALK
+        if skeleton_dict["is_attacking"]:
+            speed = SKELETON_ATTACK_SPEED
+
+        if skeleton_dict["animation_timer"] >= speed:
+            skeleton_dict["animation_timer"] = 0
+            current_list = skeleton_dict["current_sprites_list"]
+            if len(current_list) > 0:
+                skeleton_dict["current_sprite_index"] = (
+                    skeleton_dict["current_sprite_index"] + 1
+                ) % len(current_list)
+
+                if (
+                    skeleton_dict["is_attacking"]
+                    and skeleton_dict["current_sprite_index"] == 0
+                ):
+                    skeleton_dict["is_attacking"] = False
+                    skeleton_dict["attack_cooldown_timer"] = SKELETON_ATTACK_COOLDOWN
+                    skeleton_dict["is_patrolling"] = True
+
+    skeletons_to_keep = []
+    for skeleton_dict in skeletons:
+        if skeleton_dict.get("remove_me"):
+            continue
+
+        current_list = skeleton_dict["current_sprites_list"]
+        if len(current_list) > 0:
+            skeleton_dict["current_sprite_index"] %= len(current_list)
+            skeleton_dict["actor"].image = current_list[
+                skeleton_dict["current_sprite_index"]
+            ].image
+
+        skeletons_to_keep.append(skeleton_dict)
+
+    skeletons[:] = skeletons_to_keep
 
     if player_was_hit and not player_is_dead:
         player_is_dead = True
-        player_attacking = False
-        player_walking = False
-        current_sprite_index = 0
-        animation_timer = 0.0
+
+    (
+        current_player_animation_sprites,
+        player_current_sprite_index,
+        player_animation_timer,
+    ) = update_player_animation(
+        player,
+        player_is_dead,
+        player_attacking,
+        player_walking,
+        player_last_direction,
+        1 / 60.0,
+        current_player_animation_sprites,
+        player_current_sprite_index,
+        player_animation_timer,
+        player_attack_end,
+        player_dying_end,
+    )
 
 
 init_game()
-
 pgzrun.go()
