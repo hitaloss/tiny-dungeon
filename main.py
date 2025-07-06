@@ -295,7 +295,8 @@ def update_game():
         if player.colliderect(coin):
             coins.remove(coin)
             coins_collected += 1
-            sounds.picked_coin.play()
+            if music_on:
+                sounds.picked_coin.play()
 
     if coins_collected >= TOTAL_COINS:
         player_tile_x = int(player.x // TILE_SIZE)
@@ -313,29 +314,30 @@ def update_game():
         if (player_tile_x, player_tile_y) in [(14, 10), (15, 10)]:
             game_state = "transition"
             transition_target_state = "victory"
-            sounds.victory.play()
+            if music_on:
+                sounds.victory.play()
             game_won = True
 
     old_player_x, old_player_y = player.x, player.y
     player_walking = False
     if not player_attacking:
         if keyboard.left:
-            player.x -= 7
+            player.x -= 1.3
             player_walking = True
             player_last_direction = DIR_LEFT
         if keyboard.right:
-            player.x += 7
+            player.x += 1.3
             player_walking = True
             player_last_direction = DIR_RIGHT
         if not collision_check(player.x, player.y, skeletons):
             player.x = old_player_x
 
         if keyboard.up:
-            player.y -= 7
+            player.y -= 1.3
             player_walking = True
             player_last_direction = DIR_UP
         if keyboard.down:
-            player.y += 7
+            player.y += 1.3
             player_walking = True
             player_last_direction = DIR_DOWN
         if not collision_check(player.x, player.y, skeletons):
@@ -345,7 +347,8 @@ def update_game():
             player_attacking = True
             player_walking = False
             player_current_sprite_index = 0
-            sounds.sword_sfx.play()
+            if music_on:
+                sounds.sword_sfx.play()
 
     if player_attacking:
         attack_hitbox = rect(0, 0, TILE_SIZE + 4, TILE_SIZE + 4)
@@ -357,8 +360,9 @@ def update_game():
                 skeleton_dict.update(
                     {"is_dead": True, "current_sprite_index": 0, "animation_timer": 0.0}
                 )
-                sounds.bones.play()
-                sounds.bones_2.play()
+                if music_on:
+                    sounds.bones.play()
+                    sounds.bones_2.play()
 
     player_was_hit = False
     for skeleton_dict in skeletons:
@@ -426,7 +430,8 @@ def update_game():
                     "animation_timer": 0.0,
                 }
             )
-            sounds.sword_sfx.play()
+            if music_on:
+                sounds.sword_sfx.play()
 
         if skeleton_dict["is_attacking"]:
             skeleton_dict["moving_right"] = player.x > skeleton_dict["actor"].x
@@ -550,7 +555,8 @@ def update_game():
         player_is_dead = True
         game_state = "transition"
         transition_target_state = "game_over"
-        sounds.player_death.play()
+        if music_on:
+            sounds.player_death.play()
 
     (
         current_player_animation_sprites,
@@ -581,8 +587,11 @@ def on_mouse_down(pos):
         if start_button.collidepoint(pos):
             game_state = "playing"
             init_game()
-            music.play("game.ogg")
-            music.set_volume(0.3)
+            if music_on:
+                music.play("game.ogg")
+                music.set_volume(0.3)
+            else:
+                music.stop()
         if music_button.collidepoint(pos):
             music_on = not music_on
             if music_on:
@@ -597,7 +606,8 @@ def on_mouse_down(pos):
         if play_again_button.collidepoint(pos):
             game_state = "menu"
             transition_radius = 0
-            music.play("menu.mp3")
+            if music_on:
+                music.play("menu.mp3")
 
 
 def update():
