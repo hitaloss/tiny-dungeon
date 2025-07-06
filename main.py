@@ -2,6 +2,7 @@ import random
 import pgzrun
 from pgzero.actor import Actor
 from pgzero.keyboard import keyboard
+from pgzero import music
 from pygame.rect import Rect as rect
 
 # Unica exceção de import do pygame
@@ -14,44 +15,62 @@ from map.game_map import MAP_WIDTH, MAP_HEIGHT, TILE_GIDS, TILE_SIZE, MAP_DATA
 from sprites.player_sprites import player_idle_down_sprites
 from sprites.skeleton_sprites import *
 from sprites.coin_sprites import coin_sprites
+from sprites.indicator_sprites import indicator_sprites
 
 WIDTH = 800
-HEIGHT = 650
+HEIGHT = 640
 TITLE = "Tiny Dungeon"
 MAP_BACKGROUND = (234, 165, 108)
+YELLOW = (255, 255, 0)
+BLACK = (0, 0, 0)
 
 
 tiles = {}
 player = None
 skeletons = []
 coins = []
+indicators = []
 game_won = False
 coins_collected = 0
-
-
+game_state = "menu"
+music_on = True
+indicator_on = False
+transition_radius = 0
+transition_target_state = ""
 player_last_direction = DIR_DOWN
 current_player_animation_sprites = player_idle_down_sprites
 player_current_sprite_index = 0
 player_animation_timer = 0.0
 player_attacking = False
 player_is_dead = False
-
-
 coin_current_sprite_index = 0
 coin_animation_timer = 0.0
+indicator_sprites_current_index = 0
+indicator_animation_timer = 0
 
 
 def init_game():
     global player, tiles, skeletons, coins, coins_collected, game_won, player_is_dead
+    global indicators, player_attacking, player_animation_timer, player_current_sprite_index, transition_radius
 
+    player_is_dead = False
+    player_attacking = False
+    player_animation_timer = 0.0
+    player_current_sprite_index = 0
     player = Actor("player_idle_1")
     player.pos = (WIDTH // 2, HEIGHT // 2)
-    player_is_dead = False
+
+    game_state = "playing"
+    game_won = False
+    transition_radius = 0
+    skeletons.clear()
+    coins.clear()
+    indicators.clear()
+    coins_collected = 0
 
     for tile_name in set(TILE_GIDS.values()):
         tiles[tile_name] = Actor(tile_name)
 
-    skeletons.clear()
     skeleton_positions = [
         (4, 2),
         (4, 21),
@@ -73,30 +92,27 @@ def init_game():
             pos[0] * TILE_SIZE + TILE_SIZE // 2,
             pos[1] * TILE_SIZE + TILE_SIZE // 2,
         )
+        skeletons.append(
+            {
+                "actor": actor,
+                "patrol_start_x": actor.x - SKELETON_PATROL_DISTANCE / 2,
+                "patrol_end_x": actor.x + SKELETON_PATROL_DISTANCE / 2,
+                "moving_right": True,
+                "is_patrolling": True,
+                "is_attacking": False,
+                "is_dead": False,
+                "hit_applied": False,
+                "despawn_timer": 0.0,
+                "idle_timer": 0.0,
+                "attack_hit_timer": 0.0,
+                "attack_cooldown_timer": SKELETON_ATTACK_COOLDOWN,
+                "animation_timer": 0.0,
+                "current_sprite_index": 0,
+                "current_sprites_list": skeleton_idle_sprites,
+            }
+        )
 
-        skeleton_dict = {
-            "actor": actor,
-            "patrol_start_x": actor.x - SKELETON_PATROL_DISTANCE / 2,
-            "patrol_end_x": actor.x + SKELETON_PATROL_DISTANCE / 2,
-            "moving_right": True,
-            "is_patrolling": True,
-            "is_attacking": False,
-            "is_dead": False,
-            "hit_applied": False,
-            "despawn_timer": 0.0,
-            "idle_timer": 0.0,
-            "attack_hit_timer": 0.0,
-            "attack_cooldown_timer": SKELETON_ATTACK_COOLDOWN,
-            "animation_timer": 0.0,
-            "current_sprite_index": 0,
-            "current_sprites_list": skeleton_idle_sprites,
-        }
-        skeletons.append(skeleton_dict)
-
-    coins.clear()
-    coins_collected = 0
-    game_won = False
-    coin_positions = [(3, 3), (3, 21), (27, 7), (35, 38), (45, 35), (47, 8), (39, 38)]
+    coin_positions = [(3, 3), (3, 21), (27, 7), (13, 28), (19, 27), (47, 8), (24, 35)]
     for pos in coin_positions:
         coin = Actor("coin_1")
         coin.pos = (
@@ -106,7 +122,7 @@ def init_game():
         coins.append(coin)
 
 
-def draw():
+def draw_game():
     screen.fill(MAP_BACKGROUND)
 
     for y in range(MAP_HEIGHT):
@@ -123,6 +139,100 @@ def draw():
         coin.draw()
     for skeleton_dict in skeletons:
         skeleton_dict["actor"].draw()
+    for indicator in indicators:
+        indicator.draw()
+
+    text = f"Moedas: {coins_collected}/{TOTAL_COINS}"
+    screen.draw.text(
+        text,
+        topright=(WIDTH - 15, 17),
+        fontsize=20,
+        color=YELLOW,
+        ocolor=BLACK,
+        owidth=1.5,
+        fontname="pixel.ttf",
+    )
+
+
+def draw_menu():
+    screen.fill(BLACK)
+
+    screen.draw.text(
+        "TINY DUNGEON",
+        center=(WIDTH // 2, HEIGHT * 0.25),
+        fontsize=50,
+        color="white",
+        ocolor=BLACK,
+        owidth=1.5,
+        fontname="pixel.ttf",
+    )
+
+    screen.draw.text(
+        "JOGAR",
+        center=(WIDTH // 2 - 100, HEIGHT * 0.6),
+        fontsize=15,
+        color="white",
+        ocolor=BLACK,
+        owidth=1.5,
+        fontname="pixel.ttf",
+    )
+
+    music_text = "SOM: LIGADO" if music_on else "SOM: DESLIGADO"
+    screen.draw.text(
+        music_text,
+        center=(WIDTH // 2 + 100, HEIGHT * 0.6),
+        fontsize=15,
+        color="white",
+        ocolor=BLACK,
+        owidth=1.5,
+        fontname="pixel.ttf",
+    )
+
+    screen.draw.text(
+        "SAIR",
+        topleft=(15, 15),
+        fontsize=15,
+        color="white",
+        ocolor=BLACK,
+        owidth=1.5,
+        fontname="pixel.ttf",
+    )
+
+
+def draw_endscreen(message):
+    screen.fill(BLACK)
+    screen.draw.text(
+        message,
+        center=(WIDTH // 2, HEIGHT * 0.25),
+        fontsize=50,
+        color="white",
+        ocolor=BLACK,
+        owidth=1.5,
+        fontname="pixel.ttf",
+    )
+    screen.draw.text(
+        "JOGAR DE NOVO",
+        center=(WIDTH // 2, HEIGHT * 0.6),
+        fontsize=15,
+        color="white",
+        ocolor=BLACK,
+        owidth=1.5,
+        fontname="pixel.ttf",
+    )
+
+
+def draw():
+    if game_state == "menu":
+        draw_menu()
+    elif game_state == "playing":
+        draw_game()
+    elif game_state == "transition":
+        draw_game()
+        screen.draw.filled_circle((player.x, player.y), transition_radius, BLACK)
+    elif game_state == "game_over":
+        draw_endscreen("DERROTA")
+    elif game_state == "victory":
+        draw_endscreen("FIM DE JOGO")
 
 
 def player_attack_end():
@@ -145,15 +255,38 @@ def update_coin_animation():
         coin.image = new_coin_image
 
 
-def update():
+def update_indicator_animation():
+    global indicator_animation_timer, indicator_sprites_current_index
+    indicator_animation_timer += 1 / 60.0
+    if indicator_animation_timer >= ANIMATION_SPEED_COIN:
+        indicator_animation_timer = 0
+        indicator_sprites_current_index = (indicator_sprites_current_index + 1) % len(
+            indicator_sprites
+        )
+    new_indicator_image = indicator_sprites[indicator_sprites_current_index].image
+    for indicator in indicators:
+        indicator.image = new_indicator_image
+
+
+def update_transition():
+    global transition_radius, game_state, transition_target_state
+    transition_radius += 15
+
+    if transition_radius > WIDTH:
+        game_state = transition_target_state
+
+
+def update_game():
     global player_last_direction, player_attacking, player_is_dead
     global player_current_sprite_index, player_animation_timer, current_player_animation_sprites
-    global coins_collected, game_won
+    global coins_collected, game_won, game_state, transition_target_state
 
     if game_won:
         pass
 
     if player_is_dead:
+        game_state = "transition"
+        transition_target_state = "game_over"
         pass
 
     update_coin_animation()
@@ -162,35 +295,47 @@ def update():
         if player.colliderect(coin):
             coins.remove(coin)
             coins_collected += 1
-            print(f"Moedas coletadas: {coins_collected}/{TOTAL_COINS}")
+            sounds.picked_coin.play()
 
     if coins_collected >= TOTAL_COINS:
         player_tile_x = int(player.x // TILE_SIZE)
         player_tile_y = int(player.y // TILE_SIZE)
+        if not indicators:
+            indicator_pos = [(14, 10), (15, 10)]
+            for pos in indicator_pos:
+                indicator = Actor("indicator_1")
+                indicator.pos = (
+                    pos[0] * TILE_SIZE + TILE_SIZE // 2,
+                    pos[1] * TILE_SIZE + TILE_SIZE // 2,
+                )
+                indicators.append(indicator)
+        update_indicator_animation()
         if (player_tile_x, player_tile_y) in [(14, 10), (15, 10)]:
+            game_state = "transition"
+            transition_target_state = "victory"
+            sounds.victory.play()
             game_won = True
-            print("VOCE VENCEU!!!")
 
     old_player_x, old_player_y = player.x, player.y
     player_walking = False
     if not player_attacking:
         if keyboard.left:
-            player.x -= 2
+            player.x -= 7
             player_walking = True
             player_last_direction = DIR_LEFT
         if keyboard.right:
-            player.x += 2
+            player.x += 7
             player_walking = True
             player_last_direction = DIR_RIGHT
         if not collision_check(player.x, player.y, skeletons):
             player.x = old_player_x
 
         if keyboard.up:
-            player.y -= 2
+            player.y -= 7
             player_walking = True
             player_last_direction = DIR_UP
         if keyboard.down:
-            player.y += 2
+            player.y += 7
             player_walking = True
             player_last_direction = DIR_DOWN
         if not collision_check(player.x, player.y, skeletons):
@@ -200,6 +345,7 @@ def update():
             player_attacking = True
             player_walking = False
             player_current_sprite_index = 0
+            sounds.sword_sfx.play()
 
     if player_attacking:
         attack_hitbox = rect(0, 0, TILE_SIZE + 4, TILE_SIZE + 4)
@@ -211,6 +357,8 @@ def update():
                 skeleton_dict.update(
                     {"is_dead": True, "current_sprite_index": 0, "animation_timer": 0.0}
                 )
+                sounds.bones.play()
+                sounds.bones_2.play()
 
     player_was_hit = False
     for skeleton_dict in skeletons:
@@ -278,6 +426,7 @@ def update():
                     "animation_timer": 0.0,
                 }
             )
+            sounds.sword_sfx.play()
 
         if skeleton_dict["is_attacking"]:
             skeleton_dict["moving_right"] = player.x > skeleton_dict["actor"].x
@@ -350,7 +499,9 @@ def update():
                     }
                 )
 
-            skeleton_dict["idle_timer"] += round(random.uniform(0.01, 2.0), 10) / 60.0
+            skeleton_dict["idle_timer"] += (
+                round(random.SystemRandom().uniform(0.0001, 2.0), 2) / 60.0
+            )
             if skeleton_dict["idle_timer"] >= SKELETON_IDLE_DURATION:
                 skeleton_dict["is_patrolling"] = True
                 skeleton_dict["moving_right"] = not skeleton_dict["moving_right"]
@@ -397,6 +548,9 @@ def update():
 
     if player_was_hit and not player_is_dead:
         player_is_dead = True
+        game_state = "transition"
+        transition_target_state = "game_over"
+        sounds.player_death.play()
 
     (
         current_player_animation_sprites,
@@ -417,5 +571,45 @@ def update():
     )
 
 
+def on_mouse_down(pos):
+    global game_state, music_on, transition_radius
+
+    if game_state == "menu":
+        start_button = rect((WIDTH // 2 - 170, HEIGHT * 0.6 - 20), (140, 40))
+        music_button = rect((WIDTH // 2 + 30, HEIGHT * 0.6 - 20), (140, 40))
+        exit_button = rect((15, 15), (80, 30))
+        if start_button.collidepoint(pos):
+            game_state = "playing"
+            init_game()
+            music.play("game.ogg")
+            music.set_volume(0.3)
+        if music_button.collidepoint(pos):
+            music_on = not music_on
+            if music_on:
+                music.unpause()
+            else:
+                music.pause()
+        if exit_button.collidepoint(pos):
+            quit()
+
+    elif game_state in ["game_over", "victory"]:
+        play_again_button = rect((WIDTH // 2 - 190, HEIGHT * 0.6 - 20), (380, 40))
+        if play_again_button.collidepoint(pos):
+            game_state = "menu"
+            transition_radius = 0
+            music.play("menu.mp3")
+
+
+def update():
+    if game_state == "playing":
+        update_game()
+    elif game_state == "transition":
+        update_transition()
+
+
 init_game()
+
+music.play("menu.mp3")
+music.set_volume(0.3)
+
 pgzrun.go()
