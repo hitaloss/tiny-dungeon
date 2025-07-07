@@ -320,22 +320,22 @@ def update_game():
     player_walking = False
     if not player_attacking:
         if keyboard.left:
-            player.x -= 7
+            player.x -= 1.2
             player_walking = True
             player_last_direction = DIR_LEFT
         if keyboard.right:
-            player.x += 7
+            player.x += 1.2
             player_walking = True
             player_last_direction = DIR_RIGHT
         if not collision_check(player.x, player.y, skeletons):
             player.x = old_player_x
 
         if keyboard.up:
-            player.y -= 7
+            player.y -= 1.2
             player_walking = True
             player_last_direction = DIR_UP
         if keyboard.down:
-            player.y += 7
+            player.y += 1.2
             player_walking = True
             player_last_direction = DIR_DOWN
         if not collision_check(player.x, player.y, skeletons):
